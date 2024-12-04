@@ -1,0 +1,144 @@
+import tkinter as tk
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import wikipedia
+import webbrowser
+import threading
+
+recognizer = sr.Recognizer()
+engine = pyttsx3.init()
+
+user_agent = "VoiceAssistant/1.0 (your-email@example.com)"
+wikipedia.set_lang("en")
+wikipedia.set_user_agent(user_agent)
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
+
+def listen():
+    try:
+        with sr.Microphone() as source:
+            print("Listening...")
+            recognizer.adjust_for_ambient_noise(source)
+            audio = recognizer.listen(source)
+            command = recognizer.recognize_google(audio).lower()
+            print(f"Recognized command: {command}")
+            return command
+    except sr.UnknownValueError:
+        speak("Sorry, I didn't catch that.")
+        return ""
+    except sr.RequestError:
+        speak("Could not request results. Please check your internet connection.")
+        return ""
+
+def handle_greetings(command):
+    if "hello" in command or "hi" in command:
+        speak("Hello! How can I assist you today?")
+
+def tell_time():
+    current_time = datetime.datetime.now().strftime("%I:%M %p")
+    speak(f"The current time is {current_time}")
+
+def tell_date():
+    today = datetime.datetime.now().strftime("%A, %B %d, %Y")
+    speak(f"Today's date is {today}")
+
+import wikipedia
+
+def search_wikipedia():
+    speak("What would you like to know about?")
+    search_query = listen()
+    if search_query:
+        # Clean up the query if necessary
+        if "about" in search_query:
+            search_query = search_query.split("about", 1)[1].strip()
+
+        speak(f"Searching Wikipedia for {search_query}")
+        try:
+        
+            page = wikipedia.page(search_query)
+            summary = page.summary.split(". ")[0:2]  
+            summary_text = ". ".join(summary) + "."
+            speak(summary_text) 
+            print(f"Summary of {search_query}: {summary_text}")
+
+            speak("Would you like to hear more?")
+            more_info = listen()
+            if "yes" in more_info:
+                full_summary = page.summary
+                speak(full_summary[len(summary_text):])
+            else:
+                speak("Alright!")
+
+        except wikipedia.exceptions.DisambiguationError as e:
+            
+            speak(f"Sorry, I found multiple results for {search_query}. Here are a few options: {', '.join(e.options)}")
+            print(f"DisambiguationError: {e}")
+            speak("Please specify which one you'd like to know about.")
+        except wikipedia.exceptions.HTTPTimeoutError:
+            speak("The request to Wikipedia took too long. Please try again later.")
+        except wikipedia.exceptions.RedirectError:
+            speak("The page has been redirected. Please try again.")
+        except wikipedia.exceptions.PageError:
+            speak("I couldn't find a page for that topic.")
+        except Exception as e:
+            speak(f"An error occurred: {e}")
+
+def search_web(command):
+    speak("What would you like to search for?")
+    search_query = listen()
+    if search_query:
+        speak(f"Searching the web for {search_query}")
+        webbrowser.open_new_tab(f"https://www.google.com/search?q={search_query}")
+
+def process_command(command):
+    if "hello" in command or "hi" in command:
+        handle_greetings(command)
+    elif "time" in command:
+        tell_time()
+    elif "date" in command:
+        tell_date()
+    elif "search wikipedia" in command:
+        search_wikipedia()
+    elif "search" in command or "look up" in command:
+        search_web(command)
+    else:
+        speak("I'm sorry, I didn't understand that command.")
+
+# GUI Functionality
+def start_listening():
+    command_display.config(state=tk.NORMAL)
+    command_display.insert(tk.END, "Listening...\n")
+    command_display.config(state=tk.DISABLED)
+    
+    # Listen to voice and process the command
+    command = listen()
+    if command:
+        command_display.config(state=tk.NORMAL)
+        command_display.insert(tk.END, f"Command: {command}\n")
+        command_display.config(state=tk.DISABLED)
+        
+        # Process the command using the backend functions
+        process_command(command)
+
+# Create the main window
+root = tk.Tk()
+root.title("Voice Assistant Front-End")
+root.geometry("400x400")
+
+# Instructions Label
+instructions_label = tk.Label(root, text="Click the mic button and speak a command.\nExample: 'What's the time?' or 'Search Wikipedia.'", font=("Arial", 12))
+instructions_label.pack(pady=20)
+
+# Command Display (Text area)
+command_display = tk.Text(root, height=10, width=50, wrap=tk.WORD, state=tk.DISABLED)
+command_display.pack(pady=20)
+
+# Mic Button - Start listening when clicked
+mic_button = tk.Button(root, text="🎤 Start Listening", command=start_listening, font=("Arial", 14), bg="lightblue")
+mic_button.pack(pady=10)
+
+# Run the GUI loop
+root.mainloop()
